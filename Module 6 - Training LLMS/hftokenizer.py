@@ -23,7 +23,7 @@ class HFTokenizer():
 
 	def train(self, datafile):
 		self.tokenizer = self.tokenizer.train_new_from_iterator(
-			open(datafile, "r").readlines(), 
+			open(datafile, "r", encoding="utf-8").readlines(),
 			10000,
 			limit_alphabet=500,
 		)

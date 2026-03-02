@@ -24,6 +24,6 @@ for entry in ds:
 	# if len(lines) >= 100:
 	# 	break
 
-f = open("data.txt", "w")
+f = open("data.txt", "w", encoding="utf-8")
 f.writelines(lines)
 f.close()

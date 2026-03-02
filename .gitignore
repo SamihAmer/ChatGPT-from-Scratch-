@@ -5,3 +5,14 @@
 ~$*.xlsx
 ~$*.ppt
 ~$*.pptx
+~$*.txt
+
+# Large data / generated files - do not commit
+data.txt
+dataset.npy
+model_weights.pt
+loss_curve.png
+hftokenizer/
+
+
+
