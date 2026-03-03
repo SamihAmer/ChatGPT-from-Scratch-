@@ -48,7 +48,6 @@ def train():
     warmup_steps  = 500
     log_interval  = 100   # save loss curve every N steps
 
-    # adjust as needed
     model = GPTModel(d_model=512, n_heads=8, layers=6, vocab_size=10000, max_seq_len=256)
     param_count = sum(p.numel() for p in model.parameters())
     print("Model has", param_count, "parameters.")
