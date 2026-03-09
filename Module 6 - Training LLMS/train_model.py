@@ -40,7 +40,7 @@ Training hyperparameters selected:
 '''
 def train():
 
-    device = torch.device("cuda") # use "cpu" if no gpu available
+    device = torch.device("cuda") 
 
     # --- hyperparameters ---
     batch_size   = 32
@@ -63,12 +63,12 @@ def train():
         shuffle=True,
     )
 
-    total_steps = len(dataloader)
+    total_steps = len(dataloader) # number of batches in one epoch
     print(f"Total steps per epoch: {total_steps}")
 
-    opt = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    scheduler = cosine_with_warmup_lr_scheduler(opt, total_steps, warmup_steps)
-    loss_fn = torch.nn.CrossEntropyLoss()
+    opt = torch.optim.AdamW(model.parameters(), lr=learning_rate) #using AdamW optimizer, introing decoupled weight decay
+    scheduler = cosine_with_warmup_lr_scheduler(opt, total_steps, warmup_steps) 
+    loss_fn = torch.nn.CrossEntropyLoss()  # loss function
 
     tokens_seen = 0
     tokens_log  = []
@@ -114,7 +114,7 @@ def train():
             plt.savefig("./loss_curve.png")
             plt.close()
 
-    # save model weights if you want
+    # not necessary, but saving model weights for myself
     torch.save(model.state_dict(), "./model_weights.pt")
     print("Training complete. Weights saved to model_weights.pt")
 

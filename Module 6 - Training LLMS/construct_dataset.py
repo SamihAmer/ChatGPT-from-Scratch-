@@ -24,7 +24,7 @@ def construct_dataset(data_txt_file, sequence_length=256):
     tokenizer.load()
 
     # get all samples
-    f = open(data_txt_file, "r", encoding="utf-8")
+    f = open(data_txt_file, "r", encoding="utf-8") 
     samples = f.readlines()
     samples = [x.replace("\n", "") for x in samples]
 
