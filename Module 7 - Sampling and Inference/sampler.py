@@ -65,11 +65,11 @@ class Sampler:
 		logits = np.array(raw_unsorted_logits, dtype=np.float64)
 		vocab_size = len(logits)
 
-		# ---- Step 1: Build per-token temperature values ----
+		# Step 1: Build per-token temperature values  
 		# Start with temperature k = 1.0 for every token in the vocabulary
 		temperatures = np.ones(vocab_size, dtype=np.float64)
 
-		# ---- Step 2: Apply frequency penalty ----
+		#  Step 2: Apply frequency penalty  
 		# Frequency penalty increases the temperature proportionally to how many
 		# times a token has appeared in the previous sequence.
 		# k += occurrences * (frequency_penalty - 1.0)
@@ -79,7 +79,7 @@ class Sampler:
 				if 0 <= tok_id < vocab_size:
 					temperatures[tok_id] += (self.frequency_penalty - 1.0)
 
-		# ---- Step 3: Apply presence penalty ----
+		# Step 3: Apply presence penalty  
 		# Presence penalty increases the temperature if the token has appeared
 		# at all in the previous sequence (binary: occurred or not).
 		# k += (presence_penalty - 1.0) if token has occurred
@@ -90,12 +90,12 @@ class Sampler:
 				if 0 <= tok_id < vocab_size:
 					temperatures[tok_id] += (self.presence_penalty - 1.0)
 
-		# ---- Step 4: Shift logits to be non-negative ----
+		# Step 4: Shift logits to be non-negative  
 		# The penalty (dividing by temperature > 1) only works correctly when
 		# logits are positive. Subtracting the minimum ensures all are >= 0.
 		logits = logits - np.min(logits)
 
-		# ---- Step 5: Apply per-token temperatures and softmax ----
+		# Step 5: Apply per-token temperatures and softmax  
 		# Divide each logit by its temperature, then apply softmax
 		logits = logits / temperatures
 		# Softmax: subtract max for numerical stability, then exponentiate
@@ -103,13 +103,13 @@ class Sampler:
 		exp_logits = np.exp(logits)
 		probs = exp_logits / np.sum(exp_logits)
 
-		# ---- Step 6: Sort by probability (descending) ----
+		# Step 6: Sort by probability (descending)  
 		# We sort in ascending order with argsort, then reverse to get descending
 		indices = np.argsort(probs)[::-1]  # indices that sort descending
 		undo_indices = np.argsort(indices)  # to revert back to original order
 		sorted_probs = probs[indices]
 
-		# ---- Step 7: Apply top-k or top-p cutoff ----
+		#   Step 7: Apply top-k or top-p cutoff  
 		if self.top_k is not None:
 			# Top-K: keep only the top k tokens, zero out the rest
 			cutoff = min(self.top_k, vocab_size)
@@ -127,7 +127,7 @@ class Sampler:
 
 		# If both are None, we sample from the full distribution (no cutoff needed)
 
-		# ---- Step 8: Renormalize ----
+		# Step 8: Renormalize  
 		total = np.sum(sorted_probs)
 		if total > 0:
 			sorted_probs = sorted_probs / total
@@ -135,14 +135,11 @@ class Sampler:
 			# Fallback: uniform over all tokens (shouldn't happen normally)
 			sorted_probs = np.ones(vocab_size) / vocab_size
 
-		# ---- Step 9: Revert to original token-id ordering ----
+		# Step 9: Revert to original token-id ordering  
 		final_probs = sorted_probs[undo_indices]
 
 		return final_probs
 
-
-
-	#==========================
 	# for actually sampling the distribution
 	def sample_one_token(self, raw_unsorted_logits, previous_token_ids):
 		probs = self.make_token_distribution(raw_unsorted_logits, previous_token_ids)
