@@ -1,0 +1,324 @@
+\documentclass[11pt]{article}
+
+% --- Packages ---
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{parskip}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    urlcolor=blue!50!black,
+    citecolor=blue!50!black,
+}
+
+% tighter section spacing
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{1.4ex plus 1ex minus .2ex}{0.8ex plus .2ex}
+\titlespacing*{\subsection}{0pt}{1.0ex plus .8ex minus .2ex}{0.6ex plus .2ex}
+
+% nicer monospace in body — lmodern avoids the one-time METAFONT font
+% generation that T1+fontenc triggers on a fresh MiKTeX install
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+
+\title{Does a Domain-Specific BPE Tokenizer Improve In-Domain Language Modeling?\\
+\large An Evaluation on Medical Text}
+\author{Samih Amer \\ \small Individual project --- GPT-from-Scratch course final project}
+\date{April 21, 2026}
+
+\graphicspath{{artifacts/results/figures/}}
+
+\begin{document}
+\maketitle
+
+% ---------------------------------------------------------------
+\section{Introduction}
+
+Tokenization is the first transformation applied to text before an LLM ever sees it, and it quietly constrains what the model can learn: any word that is not represented as a single token must be learned as a sequence of subwords, and any linguistic unit the tokenizer fails to respect becomes a unit the model has to reconstruct from pieces. Medical text is unusually dense with specialized terminology (\texttt{cholecystectomy}, \texttt{laparoscopic}, \texttt{pneumonia}, \texttt{hypertension}, \texttt{intraoperative}) that a general-purpose tokenizer trained on web text splits into 4--6 subwords each, even though each of these is a single, semantically unified clinical concept.
+
+This project asks a straightforward question: \textbf{if we swap in a BPE tokenizer trained on medical text, while holding every other aspect of the model and training pipeline fixed, how does the model's held-out performance change on (a) in-domain medical text, (b) out-of-domain general text, and (c) cross-domain medical text?} I trained two otherwise-identical 29M-parameter GPT models on the same 100k PubMed abstracts --- one using a general BPE tokenizer trained on wikitext-103, the other using a medical BPE tokenizer trained on the same PubMed corpus --- and evaluated both against three held-out corpora using bits-per-character (BPC), the only cross-tokenizer-comparable metric.
+
+\paragraph{Key results.} With identical training compute and proper convergence (2 epochs), the medical tokenizer produces a consistent in-domain BPC advantage --- 0.010 bits/char lower on held-out PubMed at matched text exposure, widening to 0.031 bits/char at matched compute. The advantage does \emph{not} transfer to another medical sub-genre (MTSamples clinical transcripts), where the general tokenizer outperforms the medical model by about 0.48 BPC, nor to general English (wikitext), where the gap is about 0.95 BPC in favor of general. A 1-epoch pilot under-stated the medical tokenizer's advantage because the cosine learning-rate schedule collapsed prematurely and general under-converged in a way that temporarily depressed its held-out BPC; this motivated the 2-epoch rerun reported here.
+
+The headline finding: \textbf{domain-specific tokenization is a real but narrow win}. It helps the specific register it was trained on; it hurts everything else.
+
+% ---------------------------------------------------------------
+\section{Background}
+
+\subsection{The GPT model, briefly}
+
+A decoder-only transformer (Vaswani et al.\ 2017; Radford et al.\ 2018) maps a sequence of tokens to a probability distribution over the next token, autoregressively. Each layer applies causal multi-head self-attention followed by a feed-forward block; pre-LayerNorm is standard for stability. Training minimizes cross-entropy of the predicted distribution against the next-token targets. The model used here is the Module 6 implementation: 6 layers, 8 heads, \texttt{d\_model=512}, \texttt{max\_seq\_len=256}, \texttt{vocab\_size=10{,}000}, approximately 29.3M parameters.
+
+\subsection{BPE tokenization}
+
+Byte-Pair Encoding (Sennrich et al.\ 2016) starts from a byte-level alphabet and iteratively merges the most frequent adjacent symbol pairs in a training corpus until it has built up a vocabulary of the target size (here, 10,000). The resulting vocabulary is a fixed inventory of frequent subword sequences --- common whole words, frequent suffixes, byte-level fallback for anything else. \textbf{The training corpus determines which merges are profitable.} A BPE trained on wikitext sees \texttt{the}, \texttt{and}, \texttt{tion} as high-utility merges; a BPE trained on PubMed sees \texttt{cellular}, \texttt{clinical}, and \texttt{cholecystectomy} as high-utility merges. Same algorithm, same vocabulary size --- different vocabulary \emph{contents}.
+
+\subsection{Why per-token perplexity cannot compare tokenizers}
+
+Perplexity is the exponential of average cross-entropy per token. If tokenizer A represents a document in 100 tokens and tokenizer B represents it in 200 tokens, a per-token loss of $l$ means very different things in each case --- B's tokens are easier to predict because each one carries less information. BPC normalizes to characters of raw text and is therefore comparable across tokenizers:
+\begin{equation}
+\mathrm{BPC} = \frac{\log_2(e) \cdot \mathrm{CE}_{\text{nats}} \cdot N_{\text{tokens}}}{N_{\text{chars}}}
+\end{equation}
+BPC is the primary metric throughout this report.
+
+% ---------------------------------------------------------------
+\section{Methods}
+
+\subsection{Experimental design}
+
+The only variable I change is the tokenizer. Both GPT runs use the identical architecture, optimizer, learning-rate schedule, batch size, gradient clip, and training corpus (raw PubMed abstracts).
+
+\begin{table}[H]
+\centering
+\caption{Shared model and training config.}
+\begin{tabular}{ll}
+\toprule
+Setting & Value \\
+\midrule
+Architecture & Pre-LN GPT, custom causal MHA with fused QKV \\
+d\_model / n\_heads / layers & 512 / 8 / 6 \\
+vocab\_size / max\_seq\_len & 10,000 / 256 \\
+Parameters & 29,283,088 \\
+Optimizer & AdamW, lr=3e-4, warmup=500, cosine decay to 10\% of peak \\
+Batch size / grad clip & 32 / 1.0 \\
+Epochs & 2 (1-epoch pilot also reported) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Tokenizers --- HuggingFace byte-level BPE, \texttt{vocab\_size=10{,}000}, both reached $\sim$9,743 merges.}
+\begin{tabular}{lll}
+\toprule
+Tokenizer & Training corpus & Artifact \\
+\midrule
+\texttt{general} & wikitext-103 train (129k lines) & \texttt{artifacts/tokenizers/general/} \\
+\texttt{medical} & PubMed abstracts (100k docs) & \texttt{artifacts/tokenizers/medical/} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Datasets}
+
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+    \item \textbf{Training corpus (shared):} 100,000 PubMed abstracts (about 122M chars). Source: \texttt{ccdv/pubmed-summarization} via HuggingFace \texttt{datasets}.
+    \item \textbf{In-domain eval:} 2,000 held-out PubMed abstracts.
+    \item \textbf{Out-of-domain eval:} 1,298 wikitext-103 validation lines.
+    \item \textbf{Cross-domain medical eval:} 4,966 MTSamples clinical transcripts (SOAP notes, operative reports, discharge summaries). Source: \texttt{tchebonenko/MedicalTranscriptions}.
+\end{itemize}
+
+MTSamples provides a useful control: it is also medical, but in a very different register (conversational clinical dictation) from PubMed (formal academic prose). If the medical tokenizer's advantage is about ``medical text'' in general, we should see transfer; if it is about PubMed's specific register, we should not.
+
+\subsection{Two fairness frames}
+
+A tokenizer that packs more characters per token will, for a fixed training corpus, produce fewer training tokens --- and therefore fewer gradient updates per epoch at fixed batch size. This is the phenomenon being studied, but it forces a choice between:
+
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+    \item \textbf{Option 1 --- same compute (same step count).} The medical tokenizer sees more raw text than general for an equal number of gradient updates. Fair at matched compute budget.
+    \item \textbf{Option 2 --- same text exposure (one epoch each).} General runs for more gradient updates than medical because its dataset has more tokens. Fair at matched data exposure.
+\end{itemize}
+
+Under the 2-epoch regime, medical finishes at step 6,141 (end of its second epoch); general continues to step 7,783. I evaluate three checkpoints: \texttt{general@6141} (Option 1), \texttt{general@7783} (Option 2), and \texttt{medical@6141}. Loss curves are logged with three x-axes (step / tokens / chars) so any frame can be read off the same data.
+
+\subsection{Evaluation}
+
+For each (checkpoint, eval corpus) pair, I tokenize the eval text with the corresponding tokenizer, compute the token-level cross-entropy loss under teacher forcing, and convert to BPC using the formula from Equation~(1). Raw perplexity is reported for reference but not used for cross-tokenizer comparison.
+
+\subsection{Qualitative generation}
+
+Using the Module 7 sampler (top-p=0.8, freq/presence penalties=1.1), I generated 120-token continuations from a fixed set of six prompts --- four medical (\texttt{``Patient presents with''}, \texttt{``CT of the abdomen shows''}, \texttt{``The patient was administered''}, \texttt{``Postoperative diagnosis:''}), one surgical (\texttt{``Laparoscopic cholecystectomy was performed''}), and one neutral sanity check (\texttt{``The quick brown fox''}).
+
+% ---------------------------------------------------------------
+\section{Results}
+
+\subsection{Token efficiency --- the tokenizers themselves}
+
+Before training any model, the tokenizers can be compared directly on the three eval corpora (Figure~\ref{fig:tokeff}). The medical tokenizer achieves \textbf{27\% better compression} on in-domain PubMed (4.85 vs 3.82 chars/token), but \textbf{31\% worse} on wikitext (2.85 vs 4.17). MTSamples is a tie ($\sim$3.21 vs 3.20). The asymmetry is informative: the medical tokenizer has a compression edge only on text that closely resembles its training corpus.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig1_token_efficiency.png}
+\caption{Characters per token on each held-out corpus. Higher is better for that tokenizer. The medical tokenizer wins on in-domain PubMed, loses on out-of-domain wikitext, and ties on MTSamples (clinical transcripts).}
+\label{fig:tokeff}
+\end{figure}
+
+Showcase tokenization of medical terms makes the mechanism concrete:
+
+\begin{table}[H]
+\centering
+\caption{How each tokenizer splits medical vocabulary.}
+\begin{tabular}{lll}
+\toprule
+Word & General split & Medical split \\
+\midrule
+\texttt{cholecystectomy} & \texttt{ch|ole|cy|st|ect|omy} (6) & \texttt{cholecystectomy} (1) \\
+\texttt{laparoscopic}    & \texttt{lap|ar|os|c|op|ic} (6)    & \texttt{laparoscopic} (1) \\
+\texttt{pneumonia}       & \texttt{p|ne|um|onia} (4)          & \texttt{pneumonia} (1) \\
+\texttt{hypertension}    & \texttt{hy|per|t|ension} (4)       & \texttt{hypertension} (1) \\
+\texttt{myocardial}      & \texttt{my|oc|ard|ial} (4)         & \texttt{myocardial} (1) \\
+\texttt{aspirin}         & \texttt{asp|ir|in} (3)             & \texttt{aspirin} (1) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Training dynamics}
+
+The 1-epoch training run showed general's loss plateauing at $\sim$3.2 nats from step 2,500 onwards while medical kept descending. I initially interpreted this as general having fully converged while medical still had headroom. The 2-epoch rerun disconfirms that interpretation (Figure~\ref{fig:1v2}): general's plateau was \emph{not} convergence --- it was the cosine learning-rate schedule bottoming out at 3e-5. When the schedule is spread across two epochs, general keeps learning past the 1-epoch endpoint and drops a further $\sim$0.4 nats.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig2_training_curves_3axis.png}
+\caption{2-epoch training loss curves across the three fairness frames (step / tokens / chars). Medical's per-token loss is higher throughout because each medical token is harder to predict (it carries more chars of information), not because the medical model is worse --- BPC in Section~\ref{sec:bpc} normalizes this.}
+\label{fig:3axis}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{fig3_1ep_vs_2ep.png}
+\caption{1-epoch and 2-epoch training runs overlaid. The dashed lines (1-epoch) end where the LR schedule collapses to its floor. The solid lines (2-epoch) continue to descend well past where the 1-epoch runs plateaued --- confirming the plateau was LR-schedule-limited, not data-limited.}
+\label{fig:1v2}
+\end{figure}
+
+\subsection{Held-out BPC} \label{sec:bpc}
+
+Table~\ref{tab:bpc} and Figure~\ref{fig:bpc} present the primary result. At 1 epoch, medical's advantage on in-domain PubMed was ambiguous (a 0.027 BPC lead under matched compute, essentially a tie under matched text). At 2 epochs, with both models properly converged, \textbf{medical wins under both fairness frames}: by 0.031 BPC under Option 1 (matched compute) and 0.010 BPC under Option 2 (matched text exposure).
+
+\begin{table}[H]
+\centering
+\caption{Held-out BPC (lower is better; bold = per-row minimum).}
+\label{tab:bpc}
+\begin{tabular}{llrrr}
+\toprule
+Corpus & Epochs & general @ Opt-1 & general @ Opt-2 & medical \\
+\midrule
+pubmed\_eval    & 1 & 1.2207          & \textbf{1.1926} & 1.1942 \\
+pubmed\_eval    & 2 & 1.0805          & 1.0598          & \textbf{1.0496} \\
+wikitext\_eval  & 1 & \textbf{2.7536} & 2.7664          & 3.8424 \\
+wikitext\_eval  & 2 & \textbf{2.7591} & 2.7667          & 3.7172 \\
+mtsamples\_eval & 1 & \textbf{3.0737} & 3.0756          & 3.6571 \\
+mtsamples\_eval & 2 & 3.0340          & \textbf{3.0278} & 3.5070 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig4_bpc_comparison.png}
+\caption{Held-out BPC by (checkpoint, corpus), at 1 epoch (left) and 2 epochs (right). Medical wins on in-domain PubMed at 2 epochs; general wins on wikitext and MTSamples at both epoch counts.}
+\label{fig:bpc}
+\end{figure}
+
+\subsection{Differential improvement from 1 to 2 epochs}
+
+Figure~\ref{fig:delta} isolates the effect of the extra epoch on each model:
+
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+    \item \textbf{Medical improved roughly uniformly} across all three corpora (0.12--0.15 BPC everywhere).
+    \item \textbf{General improved strongly only on in-domain PubMed} (0.133 BPC); its wikitext BPC did not move at all (+0.0003) and MTSamples moved only modestly (0.048).
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig5_bpc_delta.png}
+\caption{Per-corpus BPC improvement going from 1 to 2 epochs. General is already saturated on corpora its model cannot ``reach''; medical was more universally under-trained at 1 epoch and continued to refine everywhere.}
+\label{fig:delta}
+\end{figure}
+
+\subsection{Qualitative differences}
+
+Both models generate medical-flavored text with sentence-level incoherence (29M params and an under-trained regime), but the \textbf{shape of their errors differs in a way that traces directly to tokenization.}
+
+\begin{table}[H]
+\centering
+\caption{Medical terminology in 2-epoch generations.}
+\small
+\begin{tabular}{p{0.22\textwidth} p{0.34\textwidth} p{0.34\textwidth}}
+\toprule
+& General model (2-ep) & Medical model (2-ep) \\
+\midrule
+Correctly-emitted rare terms
+& \texttt{laparoscopic}, \texttt{pulmonary nodules}, \texttt{biliary traction}
+& \texttt{pancreaticoduodenectomy}, \texttt{carcinoembryonic gastric bypass}, \texttt{extraperitoneal lymphoma}, \texttt{thoracoscopic surgery}, \texttt{tracheotomy}, \texttt{pancreatobiliary resection} \\
+\midrule
+Invented compounds / portmanteaus
+& \textbf{udgulopathy}, \textbf{bronchiolitin stenting}, \textbf{emtourmesing}, \textbf{premal lipomas}, (1-ep) \textbf{cholesterolecystitis}
+& \textbf{laparoscopic cholecystostomyectomy} (composed two real procedure morphemes into a nonexistent one) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The mechanism is the same one suggested by the showcase splits: when \texttt{cholecystectomy} is a single token, the medical model either emits it correctly or not at all; when it is a 6-token sequence, the general model can pick a wrong subword mid-sequence and produce \texttt{cholesterolecystitis}. The medical tokenizer does not make the model immune to fabrication --- the \texttt{cholecystostomy + ectomy} portmanteau shows it can still invent compounds --- but it rules out the specific char-level drift failure mode that the general model is prone to.
+
+\paragraph{Domain collapse on the out-of-domain prompt.}
+Both models immediately drift away from \texttt{``The quick brown fox''} into PubMed-adjacent text, but into \emph{different} sub-genres: general heads toward bacteriology (\texttt{``foxacillus scorans''}), medical heads toward biochemistry (\texttt{``deuterase, cyclic dipeptide, halohexylation''}). Each tokenizer's vocabulary primes the model toward what it is most ready to emit.
+
+% ---------------------------------------------------------------
+\section{Conclusions}
+
+\paragraph{Main finding.} At matched training horizon, a domain-specific BPE tokenizer produces a modest but consistent in-domain BPC advantage on medical text --- 0.010 BPC under matched text exposure, widening to 0.031 BPC under matched compute. Under both fairness frames, the medical tokenizer wins on held-out PubMed at 2 epochs.
+
+\subsection*{Two surprises worth dwelling on}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{The advantage does not transfer across medical sub-genres.} Despite being a ``medical'' tokenizer, it loses to the general tokenizer by $\sim$0.48 BPC on MTSamples clinical transcripts. Phase-3 token efficiency already hinted at this --- the medical tokenizer had no compression edge on MTSamples (tied at $\sim$3.21 chars/tok). Tokenizer specialization appears to be \textbf{register-specific, not domain-specific}: the medical tokenizer knows PubMed's vocabulary of formal academic medicine, not the clipped dictation style of clinical transcripts.
+
+    \item \textbf{The 1-epoch run was misleading and initially produced the wrong conclusion.} At 1 epoch, Option-2 BPC was a tie and it was tempting to conclude that the medical tokenizer was a compute-efficiency trick that vanished under matched text. The 2-epoch rerun disconfirmed this: general's ``plateau'' at 1 epoch was a learning-rate schedule artifact (cosine had collapsed to 3e-5), not true convergence. Once the schedule was extended to span the full 2-epoch horizon, general kept improving on in-domain PubMed by $\sim$0.13 BPC --- and medical improved even more, by $\sim$0.15 BPC --- making medical's lead robust under both fairness frames. \textbf{Under-training can mask the effect being studied}, and running a short pilot without checking that both arms have actually converged is a failure mode worth naming.
+\end{enumerate}
+
+\subsection*{What the experiment does NOT show}
+
+\begin{itemize}[leftmargin=*, itemsep=0pt]
+    \item It does not show that medical tokenizers always help. A corpus better matched to MTSamples' register --- or a tokenizer trained on a mixture of PubMed and MTSamples --- might fare differently.
+    \item It does not show a large effect size. At 29M parameters and $\sim$25--32M training tokens we are roughly 18x below Chinchilla-optimal, and both models are well under-trained; it is plausible the tokenizer gap would widen (or collapse) at scale, but nothing in this project can settle that.
+    \item It does not control for the learning-rate-schedule artifact at the Option-1 comparison step: at step 6{,}141, general is at $\sim$78\% of its cosine schedule (LR $\approx$ 7.7e-5) while medical is at $\sim$100\% (LR $\approx$ 3e-5). Medical has finished its schedule at the point of comparison; general has not. This nuance does not invalidate the direction of the result, but it is honestly reported.
+\end{itemize}
+
+% ---------------------------------------------------------------
+\section{Impact and Future Work}
+
+\paragraph{Scale.}
+If this pattern held at production scale --- a modest in-domain BPC advantage with an equal-sized cost on out-of-domain text --- the design implication is clear: a single organization training one flagship LLM on a mixed general corpus should keep a general tokenizer; a specialized model for a single professional register (medical literature, legal case law, code in a specific language) might profit from a domain tokenizer, but only if the deployment target's register matches the tokenizer's training corpus. The MTSamples result is a warning --- intuition that ``medical text is medical text'' is wrong at the tokenizer level, and deployment mismatches between a specialist tokenizer's training register and the inference-time register are likely to hurt.
+
+\paragraph{What I would try next with more compute.}
+
+\begin{enumerate}[leftmargin=*, itemsep=0pt]
+    \item \textbf{Mixed-corpus tokenizer.} Train a BPE on a carefully-balanced mixture of PubMed, MTSamples, drug monographs, and general English. Does it preserve the PubMed advantage while closing the MTSamples gap and reducing the wikitext cost?
+    \item \textbf{Chinchilla-scale training.} Run both models to their Chinchilla-optimal $\sim$580M tokens (roughly 10 epochs at this dataset size, or scale the corpus). The tokenizer effect might tighten or widen with true convergence.
+    \item \textbf{Register-aware tokenization.} Use a tokenizer-of-tokenizers that can switch subword dictionaries per document based on a lightweight classifier (PubMed vs MTSamples vs general). Costs one classifier forward pass per document; may recover the bulk of the specialist advantage while avoiding the out-of-register collapse.
+    \item \textbf{Loss-vs-chars curves at scale.} The chars-axis plot is the tokenizer-fair way to read training efficiency, and it would be interesting to see whether the two curves in Figure~\ref{fig:3axis}(c) cross at some point on a larger compute budget --- the current data at step 6,141 has medical ahead per char; it is unclear if that is robust past convergence.
+    \item \textbf{Decoder-side sampling analysis.} The finding that the medical model invents \texttt{cholecystostomyectomy} (a portmanteau of real morphemes) while the general model invents \texttt{cholesterolecystitis} (a char-level drift) suggests that hallucination analysis should be tokenizer-conditioned: different tokenizers produce qualitatively different failure modes, not just different error rates.
+\end{enumerate}
+
+\paragraph{Broader takeaway.}
+Tokenization is often treated as a preprocessing step and receives less attention than architectural or training choices. This project is a small data point in favor of taking it seriously: holding everything else constant, a different tokenizer measurably changed held-out BPC, altered the \emph{shape} of the model's generation errors, and --- most importantly --- \textbf{did not generalize where I naively assumed it would}. The phrase ``medical tokenizer'' is less meaningful than ``PubMed-abstract tokenizer,'' and that distinction only became visible because MTSamples was in the evaluation suite.
+
+% ---------------------------------------------------------------
+\section*{Appendix A --- Reproduction}
+
+All code in \texttt{Project/}. Pipeline orchestrated by \texttt{main.py}:
+
+\begin{verbatim}
+python main.py --phase prepare_data        # ~5-15 min, downloads corpora
+python main.py --phase train_tokenizers    # ~5-10 min, CPU-only
+python main.py --phase efficiency          # Figure 1 numbers
+python main.py --phase construct_datasets  # ~5 min
+python main.py --phase train_all           # ~1.5-1.75 hr on RTX 4070 Ti (2 epochs)
+python main.py --phase evaluate            # Table 3 numbers
+python main.py --phase generate            # Table 5 samples
+python make_plots.py                       # all figures
+\end{verbatim}
+
+Reference logs: \texttt{results\_1epoch.md}, \texttt{results\_2epoch.md}. All weights, datasets, figures, and samples under \texttt{artifacts/} (git-ignored).
+
+\end{document}

@@ -13,5 +13,15 @@ dataset.npy
 model_weights.pt
 hftokenizer/
 
+# Unrelated repo that lives inside this folder by accident
+Deep-Learning-for-Computer-Vision/
 
+# LaTeX build byproducts (regenerated on every compile)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
 

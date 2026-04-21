@@ -76,23 +76,45 @@ def phase_smoke():
 
 
 def phase_train_all():
+    # We train both models for 2 epochs with a cosine LR schedule spanning the
+    # full 2-epoch horizon. Medical has 3,071 batches/epoch, so its 2-epoch
+    # endpoint is step 6141 (indices 0..6141 = 6142 optimizer updates, the last
+    # batch of each epoch is partial). General has 3,892 batches/epoch, so its
+    # 2-epoch endpoint is step 7783. We save a matched-compute checkpoint for
+    # general at step 6141 to enable the same-step (Option 1) BPC comparison.
+    EPOCHS = "2"
+    SAME_STEP_BOUNDARY = "6141"
     for name in ("general", "medical"):
-        run([sys.executable, "train.py",
-             "--dataset", os.path.join(DS, f"pubmed_train_{name}.npy"),
-             "--tokenizer", os.path.join(TOK, name),
-             "--out", os.path.join(W, name)])
+        cmd = [sys.executable, "train.py",
+               "--dataset", os.path.join(DS, f"pubmed_train_{name}.npy"),
+               "--tokenizer", os.path.join(TOK, name),
+               "--out", os.path.join(W, name),
+               "--epochs", EPOCHS]
+        if name == "general":
+            cmd += ["--checkpoint-steps", SAME_STEP_BOUNDARY]
+        run(cmd)
 
 
 def phase_evaluate():
-    for name in ("general", "medical"):
-        weights = os.path.join(W, name, "model_weights.pt")
+    # (tokenizer_name, weights_filename, label)
+    # The step6141 checkpoint is general's compute-matched snapshot for the
+    # 2-epoch run so we can compare general@6141 against medical@6141
+    # (medical's 2-epoch end-of-training).
+    runs = [
+        ("general", "model_weights.pt",            "general_2ep"),
+        ("general", "model_weights_step6141.pt",   "general_step6141"),
+        ("medical", "model_weights.pt",            "medical_2ep"),
+    ]
+    for name, weights_file, label in runs:
+        weights = os.path.join(W, name, weights_file)
         if not os.path.isfile(weights):
-            print(f"skipping evaluate[{name}]: no weights at {weights}")
+            print(f"skipping evaluate[{label}]: no weights at {weights}")
             continue
         for eval_corpus in ("pubmed_eval", "wikitext_eval", "mtsamples_eval"):
             path = os.path.join(DATA, f"{eval_corpus}.txt")
             if not os.path.isfile(path):
                 continue
+            print(f"\n--- {label} on {eval_corpus} ---")
             run([sys.executable, "evaluate.py",
                  "--weights", weights,
                  "--tokenizer", os.path.join(TOK, name),

@@ -109,6 +109,10 @@ def train(args):
     scheduler = cosine_with_warmup_lr_scheduler(opt, total_steps, args.warmup)
     loss_fn = torch.nn.CrossEntropyLoss()
 
+    checkpoint_steps = set(
+        int(s) for s in args.checkpoint_steps.split(",") if s.strip()
+    ) if args.checkpoint_steps else set()
+
     log_rows = []  # (step, tokens_seen, chars_seen, loss)
     tokens_seen = 0
     step = 0
@@ -139,6 +143,11 @@ def train(args):
                 _save_loss_plot(log_rows, os.path.join(args.out, "loss_curve.png"))
                 _save_loss_csv(log_rows, os.path.join(args.out, "loss_log.csv"))
 
+            if step in checkpoint_steps:
+                ckpt_path = os.path.join(args.out, f"model_weights_step{step}.pt")
+                torch.save(model.state_dict(), ckpt_path)
+                print(f"  checkpoint saved at step {step} -> {ckpt_path}")
+
             step += 1
         if step >= max_steps:
             break
@@ -156,12 +165,15 @@ def _save_loss_plot(rows, path):
         return
     steps = [r[0] for r in rows]
     tokens = [r[1] for r in rows]
+    chars = [r[2] for r in rows]
     losses = [r[3] for r in rows]
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
     ax1.plot(steps, losses)
     ax1.set_xlabel("step"); ax1.set_ylabel("loss"); ax1.set_title("loss vs step")
     ax2.plot(tokens, losses)
     ax2.set_xlabel("tokens"); ax2.set_ylabel("loss"); ax2.set_title("loss vs tokens")
+    ax3.plot(chars, losses)
+    ax3.set_xlabel("chars"); ax3.set_ylabel("loss"); ax3.set_title("loss vs chars")
     plt.tight_layout()
     plt.savefig(path); plt.close()
 
@@ -207,6 +219,10 @@ def main():
     ap.add_argument("--log-interval", type=int, default=100)
     ap.add_argument("--max-steps", type=int, default=0,
                     help="Cap total steps. 0 = run to end of --epochs. Useful for smoke tests.")
+    ap.add_argument("--checkpoint-steps", type=str, default="",
+                    help="Comma-separated step numbers at which to save intermediate weights "
+                         "(e.g. '3070' to capture the point where medical finishes its epoch, "
+                         "for a same-step fairness comparison with the general run).")
     args = ap.parse_args()
     train(args)
 
