@@ -129,7 +129,7 @@ A tokenizer that packs more characters per token will, for a fixed training corp
     \item \textbf{Option 2 --- same text exposure (one epoch each).} General runs for more gradient updates than medical because its dataset has more tokens. Fair at matched data exposure.
 \end{itemize}
 
-Under the 2-epoch regime, medical finishes at step 6,141 (end of its second epoch); general continues to step 7,783; mtsamples reaches step 7,672. I evaluate at the matched-compute boundary (step 6,141) and at each tokenizer's own end-of-training step. Loss curves are logged with three x-axes (step / tokens / chars) so any frame can be read off the same data.
+Under the 2-epoch regime, medical finishes at step 6,142 (end of its second epoch); general continues to step 7,784; mtsamples reaches step 7,672. I evaluate at the matched-compute boundary (step 6,141) and at each tokenizer's own end-of-training step. Loss curves are logged with three x-axes (step / tokens / chars) so any frame can be read off the same data.
 
 \paragraph{Where the two frames collapse.} For \texttt{medical}, Option 1 and Option 2 are effectively the same checkpoint: medical's 2-epoch endpoint at step 6{,}142 is one optimizer step past the matched-compute checkpoint at step 6{,}141, and no gradient update separates them in practice. For \texttt{mtsamples}, the step-6,141 and step-7,672 checkpoints differ but the matched-compute number is reported only as a sanity check; the headline mtsamples comparisons in Section~\ref{sec:bpc} use the epoch-end checkpoint. The two fairness frames diverge meaningfully \emph{only} for the general tokenizer, whose training horizon (step 7,784) is substantially longer than medical's (step 6,142) because general's tokenizer produces more tokens per character.
 
