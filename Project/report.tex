@@ -34,7 +34,7 @@
 \title{Does a Domain-Specific BPE Tokenizer Improve In-Domain Language Modeling?\\
 \large An Evaluation on Medical Text}
 \author{Samih Amer \\ \small Individual project --- GPT-from-Scratch course final project}
-\date{May 5, 2026 \\ \small (v2 -- adds multi-seed sweep and an MTSamples-trained tokenizer arm)}
+\date{May 5, 2026}
 
 \graphicspath{{artifacts/results/figures/}}
 
@@ -48,7 +48,7 @@ Tokenization is the first transformation applied to text before an LLM ever sees
 
 This project asks a straightforward question: \textbf{if we swap in a BPE tokenizer trained on medical text, while holding every other aspect of the model and training pipeline fixed, how does the model's held-out performance change on (a) in-domain medical text, (b) out-of-domain general text, and (c) cross-domain medical text?} I trained otherwise-identical 29M-parameter GPT models on the same 100k PubMed abstracts under three different tokenizers --- a general BPE trained on wikitext-103, a medical BPE trained on the same PubMed corpus, and an MTSamples BPE trained on a corpus of clinical transcripts --- and evaluated all three against three held-out corpora using bits-per-character (BPC), the only cross-tokenizer-comparable metric. To distinguish real effects from seed noise, the GPT training was repeated over multiple seeds (5 / 5 / 3 for general / medical / mtsamples) and inferential statistics (paired t-tests, 95\% CIs, Cohen's d) were run on the seed-matched results.
 
-\paragraph{Key results.} The headline finding is a \textbf{register-distinctness scaling}: domain-specific tokenization wins on its training register, with effect size proportional to how distinct that register is from general English. The MTSamples-trained tokenizer beats general by \textbf{0.78 BPC} on MTSamples eval (n=3, 95\% CI [0.73, 0.83], p=0.0002) and beats medical by 1.28 BPC on the same corpus --- the largest single-corpus tokenizer effect we measured. The PubMed in-domain effect, by contrast, is real but small: medical wins by \textbf{0.010 BPC} at matched text exposure (n=5, 95\% CI [0.006, 0.013], p=0.002, d=+3.15), \emph{roughly 80x smaller} than the MTSamples effect. And out-of-domain costs are asymmetric: the MTSamples-trained tokenizer essentially \emph{ties} general on PubMed (1.0592 vs 1.0591), while the medical (PubMed-trained) tokenizer pays the largest out-of-domain cost on every corpus except its own. The v2 framing supersedes v1's ``real but narrow win'': \textbf{the win is narrow only when the register is close to general English}, and the project's biggest tokenizer effect was invisible in v1 because the relevant tokenizer wasn't in the experiment.
+\paragraph{Key results.} The headline finding is a \textbf{register-distinctness scaling}: the size of a domain tokenizer's win is approximately a function of how distinct its training register is from general English. The MTSamples-trained tokenizer beats general by \textbf{0.78 BPC} on MTSamples eval (n=3, 95\% CI [0.73, 0.83], p=0.0002) and beats medical by 1.28 BPC on the same corpus --- the largest single-corpus tokenizer effect we measured. The PubMed in-domain effect, by contrast, is real but small: medical wins by \textbf{0.010 BPC} at matched text exposure (n=5, 95\% CI [0.006, 0.013], p=0.002, d=+3.15), \emph{roughly 80x smaller} than the MTSamples effect. Out-of-domain costs are asymmetric: the MTSamples-trained tokenizer essentially \emph{ties} general on PubMed (1.0592 vs 1.0591), while the medical (PubMed-trained) tokenizer pays the largest out-of-domain cost on every corpus except its own.
 
 % ---------------------------------------------------------------
 \section{Background}
@@ -74,7 +74,7 @@ BPC is the primary metric throughout this report.
 
 \subsection{Experimental design}
 
-The only variable I change is the tokenizer. Both GPT runs use the identical architecture, optimizer, learning-rate schedule, batch size, gradient clip, and training corpus (raw PubMed abstracts).
+The only variable I change is the tokenizer. All three GPT training arms use the identical architecture, optimizer, learning-rate schedule, batch size, gradient clip, and training corpus (raw PubMed abstracts).
 
 \begin{table}[H]
 \centering
@@ -107,7 +107,7 @@ Tokenizer & Training corpus & Artifact \\
 \bottomrule
 \end{tabular}
 \end{table}
-\footnotetext{The MTSamples tokenizer was trained on the same MTSamples corpus that serves as the cross-domain evaluation set. This is a tokenizer-level overlap (shared BPE merge statistics) rather than a model-level one: the GPT model itself is trained only on PubMed and never sees MTSamples text during gradient updates. We accept this overlap because retraining a separate tokenizer-train split would require re-running all prior experiments under a different eval corpus, breaking comparability with our v1 results (Table~\ref{tab:bpc-multiseed}).}
+\footnotetext{The MTSamples tokenizer was trained on the same MTSamples corpus that serves as the cross-domain evaluation set. This is a tokenizer-level overlap (shared BPE merge statistics) rather than a model-level one: the GPT model itself is trained only on PubMed and never sees MTSamples text during gradient updates. We accept this overlap because retraining a separate tokenizer-train split would require re-running all prior experiments under a different eval corpus.}
 
 \subsection{Datasets}
 
@@ -118,7 +118,7 @@ Tokenizer & Training corpus & Artifact \\
     \item \textbf{Cross-domain medical eval:} 4,966 MTSamples clinical transcripts (SOAP notes, operative reports, discharge summaries). Source: \texttt{tchebonenko/MedicalTranscriptions}.
 \end{itemize}
 
-MTSamples provides a useful control: it is also medical, but in a very different register (conversational clinical dictation) from PubMed (formal academic prose). If the medical tokenizer's advantage is about ``medical text'' in general, we should see transfer; if it is about PubMed's specific register, we should not.
+MTSamples and PubMed are both medical but in very different registers (conversational clinical dictation vs.\ formal academic prose). The experiment trains tokenizers on each (plus a general-English baseline) and evaluates all three on all three corpora, allowing the register-vs-domain question to be tested symmetrically.
 
 \subsection{Two fairness frames}
 
@@ -141,9 +141,9 @@ For each (checkpoint, eval corpus) pair, I tokenize the eval text with the corre
 
 Using the Module 7 sampler (top-p=0.8, freq/presence penalties=1.1), I generated 120-token continuations from a fixed set of six prompts --- four medical (\texttt{``Patient presents with''}, \texttt{``CT of the abdomen shows''}, \texttt{``The patient was administered''}, \texttt{``Postoperative diagnosis:''}), one surgical (\texttt{``Laparoscopic cholecystectomy was performed''}), and one neutral sanity check (\texttt{``The quick brown fox''}).
 
-\subsection{Multi-seed protocol (v2 addition)}
+\subsection{Multi-seed protocol}
 
-The v1 quantitative claims rested on single runs per tokenizer. The v2 sweep retrains each GPT under multiple seeds (5 for general, 5 for medical, 3 for mtsamples; the smaller-n arm is directional). Seeded RNGs cover \texttt{torch}, \texttt{torch.cuda}, \texttt{numpy}, and a per-seed \texttt{torch.Generator} passed to the DataLoader; CuDNN deterministic mode is \emph{not} enabled (10--20\% throughput cost not justified). The packed \texttt{.npy} dataset is shared across seeds, so seed-driven variation enters only through model init and DataLoader order. Aggregation: mean/std across seeds, paired t-tests (\texttt{scipy.stats.ttest\_rel}) with seed as the pairing variable, and 95\% CIs from the t-interval on paired diffs.
+Each GPT is retrained from scratch under multiple seeds (5 for general, 5 for medical, 3 for mtsamples; the smaller-n arm is directional). Seeded RNGs cover \texttt{torch}, \texttt{torch.cuda}, \texttt{numpy}, and a per-seed \texttt{torch.Generator} passed to the DataLoader; CuDNN deterministic mode is \emph{not} enabled (10--20\% throughput cost not justified). The packed \texttt{.npy} dataset is shared across seeds, so seed-driven variation enters only through model init and DataLoader order. Aggregation: mean/std across seeds, paired t-tests (\texttt{scipy.stats.ttest\_rel}) with seed as the pairing variable, and 95\% CIs from the t-interval on paired diffs.
 
 % ---------------------------------------------------------------
 \section{Results}
@@ -200,7 +200,7 @@ The 1-epoch training run showed general's loss plateauing at $\sim$3.2 nats from
 
 \subsubsection{The 3-tokenizer x 3-corpus matrix}
 
-Figure~\ref{fig:bpc} and Table~\ref{tab:bpc-multiseed} present the primary result of the v2 sweep: end-of-training BPC for all three tokenizers (general / medical / mtsamples) on all three eval corpora, with means and standard deviations across seeds.
+Figure~\ref{fig:bpc} and Table~\ref{tab:bpc-multiseed} present the primary result: end-of-training BPC for all three tokenizers (general / medical / mtsamples) on all three eval corpora, with means and standard deviations across seeds.
 
 \begin{figure}[!tbp]
 \centering
@@ -228,17 +228,17 @@ The diagonal-max-by-column pattern is the central observation: \textbf{each toke
 
 A note on seed-induced noise: per-cell standard deviations cluster around 0.001--0.05 BPC, well below every between-tokenizer effect we report. The Cohen's d values quoted below all sit above 3 and most above 20; this reflects how tight seed reproducibility is at this model scale, not a claim about psychometric significance.
 
-\subsubsection{The PubMed in-domain effect (v1 finding, hardened by multi-seed)}
+\subsubsection{The PubMed in-domain effect}
 
-The v1 finding (medical wins on PubMed by $\sim$0.010 BPC at matched text, $\sim$0.030 at matched compute) survives multi-seed paired t-testing in both fairness frames; the Option-2 effect that was borderline at single-run is now comfortably outside seed noise (per-seed std $\sim$0.002 BPC). All five paired tests are consolidated in Table~\ref{tab:paired} below. The Option-1 effect, while larger in magnitude, inherits the v1 caveat that at step 6{,}141 general is at $\sim$78\% of its cosine schedule while medical sits at its floor; Option-2 is the more controlled comparison.
+Medical wins on PubMed by $\sim$0.010 BPC at matched text exposure and $\sim$0.030 BPC at matched compute. Multi-seed paired t-testing confirms both effects are well above seed noise: per-seed std is $\sim$0.002 BPC. All five paired tests are consolidated in Table~\ref{tab:paired} below. The Option-1 effect, while larger in magnitude, carries the caveat that at step 6{,}141 general is at $\sim$78\% of its cosine schedule while medical sits at its floor; Option-2 is the more controlled comparison.
 
-\subsubsection{The MTSamples register effect (new headline)} \label{sec:mtsamples-effect}
+\subsubsection{The MTSamples register effect} \label{sec:mtsamples-effect}
 
 The MTSamples-trained tokenizer beats both other tokenizers on MTSamples eval by a margin much larger than anything else in the sweep (Figure~\ref{fig:bpc-3x3}):
 
 \begin{table}[H]
 \centering
-\caption{All paired t-tests across tokenizers, seed-matched. Positive ``Mean diff (a -- b)'' means tokenizer B wins. \texttt{scipy.stats.ttest\_rel}; CI from t-interval on paired diffs.}
+\caption{All paired t-tests across tokenizers, seed-matched. Positive ``Mean diff (a -- b)'' means tokenizer B wins. \texttt{scipy.stats.ttest\_rel}; CI from t-interval on paired diffs. \emph{Note:} Cohen's d values are inflated by extremely tight seed reproducibility (per-seed std 0.001--0.05 BPC); interpret as ``standard deviations above noise'' rather than as conventional psychometric effect sizes.}
 \label{tab:paired}
 \small
 \begin{tabular}{llrrrr}
@@ -257,15 +257,15 @@ mtsamples  & medical -- mtsamples (n=3)      & +1.2827 & [+1.1426, +1.4229] & 0.
 \begin{figure}[!tbp]
 \centering
 \includegraphics[width=0.78\textwidth]{fig7_bpc_3x3.png}
-\caption{End-of-training BPC across all 9 (tokenizer, eval-corpus) combinations. Color encodes per-column relative rank (green = best in column, red = worst). \textbf{Each tokenizer wins on its training register, and the size of the win scales with the register's distinctness from general English.}}
+\caption{End-of-training BPC across all 9 (tokenizer, eval-corpus) combinations. Color encodes per-column relative rank (green = best in column, red = worst). \textbf{Each tokenizer wins on its training register, and the size of the win scales with the register's distinctness from general English.} The diagonal cells (each tokenizer on its training register) are green in their column; off-diagonals are yellow or red.}
 \label{fig:bpc-3x3}
 \end{figure}
 
-The MTSamples register-match win is \textbf{roughly 80x larger} than the PubMed in-domain win in absolute terms (0.78 vs 0.0091 BPC at matched text exposure). This is the single largest tokenizer-driven effect we measured, and it reframes the v1 conclusion: \emph{the size of a domain tokenizer's advantage scales with how distinct its training register is from general English}. PubMed academic abstracts and wikitext encyclopedia prose are both register-similar (formal written English), which is why the medical-tokenizer PubMed advantage is small. Clinical dictation is genuinely lexically distinct (heavy abbreviation, fragmented syntax, dense surgical/anatomic vocabulary), which is why the MTSamples-tokenizer MTSamples advantage is large.
+The MTSamples register-match win is \textbf{roughly 80x larger} than the PubMed in-domain win in absolute terms (0.78 vs 0.0091 BPC at matched text exposure). This is the single largest tokenizer-driven effect we measured: \emph{the size of a domain tokenizer's advantage scales with how distinct its training register is from general English}. PubMed academic abstracts and wikitext encyclopedia prose are both register-similar (formal written English), which is why the medical-tokenizer PubMed advantage is small. Clinical dictation is genuinely lexically distinct (heavy abbreviation, fragmented syntax, dense surgical/anatomic vocabulary), which is why the MTSamples-tokenizer MTSamples advantage is large.
 
 \subsubsection{Asymmetric out-of-domain costs}
 
-A subtler observation, with the MTSamples arm in the experiment: the cost of using a specialized tokenizer on out-of-domain text is not constant across specialists.
+A subtler observation: the cost of using a specialized tokenizer on out-of-domain text is not constant across specialists.
 
 \begin{itemize}[leftmargin=*, itemsep=0pt]
     \item \textbf{The mtsamples tokenizer essentially \emph{ties} the general tokenizer on PubMed} (1.0592 vs 1.0591 BPC, $\Delta$ = +0.0001 --- below the seed std). It pays a moderate $\sim$0.44 BPC cost on wikitext.
@@ -274,20 +274,20 @@ A subtler observation, with the MTSamples arm in the experiment: the cost of usi
 
 Caveat: this is a single observed contrast (one register pair, one model size, one training corpus); we report it as an observation, not a generalized claim. One plausible reading is that the MTSamples tokenizer's training corpus contained enough of the basic medical vocabulary that also appears in PubMed for it to remain competitive there, while the PubMed tokenizer's training corpus was specialized to a register (formal academic) that overlaps less with both wikitext and clinical transcripts. Confirming this would require a 4th or 5th tokenizer arm; we flag it as future work in Section~\ref{sec:future}.
 
-\subsubsection{Differential improvement from 1 to 2 epochs (v1 finding, retained)}
+\subsubsection{Differential improvement from 1 to 2 epochs}
 
-The v1 single-run measurements showed medical's BPC improving roughly uniformly across all three corpora ($\sim$0.12--0.15 BPC everywhere) when going from 1 to 2 epochs while general improved strongly only on in-domain PubMed ($\sim$0.13 BPC) and barely at all on wikitext or MTSamples (Figure~\ref{fig:delta}); with the v2 mtsamples-tokenizer arm the differential-improvement pattern would extend to a 3-tokenizer story, but the v2 sweep was run only at 2 epochs, so we do not claim it here.
+The 1-vs-2-epoch differential improvement pattern (Figure~\ref{fig:delta}) is retained from the single-run experiments; we did not re-run 1-epoch experiments under the multi-seed sweep.
 
 \begin{figure}[!tbp]
 \centering
 \includegraphics[width=0.7\textwidth]{fig5_bpc_delta.png}
-\caption{Per-corpus BPC improvement going from 1 to 2 epochs (v1 single-run measurements). General is already saturated on corpora its model cannot ``reach''; medical was more universally under-trained at 1 epoch and continued to refine everywhere.}
+\caption{Per-corpus BPC improvement going from 1 to 2 epochs (single-run measurements). General is already saturated on corpora its model cannot ``reach''; medical was more universally under-trained at 1 epoch and continued to refine everywhere.}
 \label{fig:delta}
 \end{figure}
 
 \subsection{Qualitative differences}
 
-Both models generate medical-flavored text with sentence-level incoherence (29M params and an under-trained regime), but the \textbf{shape of their errors differs in a way that traces directly to tokenization.}
+The qualitative samples below come from the original generation suite, which used only the general and medical tokenizers; we did not generate from the mtsamples model. The general and medical models both generate medical-flavored text with sentence-level incoherence (29M params and an under-trained regime), but the \textbf{shape of their errors differs in a way that traces directly to tokenization.}
 
 \begin{table}[H]
 \centering
@@ -314,7 +314,7 @@ The mechanism is the same one suggested by the showcase splits: when \texttt{cho
 Both models immediately drift away from \texttt{``The quick brown fox''} into PubMed-adjacent text, but into \emph{different} sub-genres: general heads toward bacteriology (\texttt{``foxacillus scorans''}), medical heads toward biochemistry (\texttt{``deuterase, cyclic dipeptide, halohexylation''}). Each tokenizer's vocabulary primes the model toward what it is most ready to emit.
 
 \paragraph{Multi-seed note.}
-The qualitative samples in this section are from a single seed per tokenizer (the v1 generations); we did not run new generations across the v2 sweep's seeds. The failure-mode shapes documented above (intact rare medical terms vs.\ char-level portmanteaus) are tokenizer-structural rather than seed-driven, so we expect them to persist across seeds, but this is a claim about mechanism rather than a measured replication.
+The qualitative samples in this section are from a single seed per tokenizer; we did not run new generations across the multi-seed sweep. The failure-mode shapes documented above (intact rare medical terms vs.\ char-level portmanteaus) are tokenizer-structural rather than seed-driven, so we expect them to persist across seeds, but this is a claim about mechanism rather than a measured replication.
 
 % ---------------------------------------------------------------
 \section{Conclusions}
@@ -330,9 +330,9 @@ The qualitative samples in this section are from a single seed per tokenizer (th
 \subsection*{Two surprises worth dwelling on}
 
 \begin{enumerate}[leftmargin=*]
-    \item \textbf{Register distinctness, not domain-medical-ness, is the variable that scales the tokenizer effect.} The v1 framing was: ``the medical tokenizer doesn't generalize across medical sub-genres.'' The v2 reframing is more specific. PubMed academic abstracts and wikitext encyclopedia prose are register-similar (both formal written English) --- which is why the medical-tokenizer PubMed advantage is small (0.010 BPC). Clinical dictation is a \emph{genuinely lexically distinct} register (heavy abbreviation, fragmented syntax, dense surgical/anatomic vocabulary) --- which is why the MTSamples-tokenizer MTSamples advantage is large (0.78 BPC). The size of a domain tokenizer's win is approximately a function of how distinct its training register is from general English, not of how ``specialized'' the tokenizer feels in human terms.
+    \item \textbf{Register distinctness, not domain-medical-ness, is the variable that scales the tokenizer effect.} PubMed academic abstracts and wikitext encyclopedia prose are register-similar (both formal written English) --- which is why the medical-tokenizer PubMed advantage is small (0.010 BPC). Clinical dictation is a \emph{genuinely lexically distinct} register (heavy abbreviation, fragmented syntax, dense surgical/anatomic vocabulary) --- which is why the MTSamples-tokenizer MTSamples advantage is large (0.78 BPC). The size of a domain tokenizer's win is approximately a function of how distinct its training register is from general English, not of how ``specialized'' the tokenizer feels in human terms.
 
-    \item \textbf{The 1-epoch run was misleading and initially produced the wrong conclusion.} At 1 epoch, Option-2 BPC was a tie and it was tempting to conclude that the medical tokenizer was a compute-efficiency trick that vanished under matched text. The 2-epoch rerun disconfirmed this: general's ``plateau'' at 1 epoch was a learning-rate schedule artifact (cosine had collapsed to 3e-5), not true convergence. Once the schedule was extended to span the full 2-epoch horizon, general kept improving on in-domain PubMed by $\sim$0.13 BPC --- and medical improved even more, by $\sim$0.15 BPC --- making medical's lead robust under both fairness frames. \textbf{Under-training can mask the effect being studied}, and running a short pilot without checking that both arms have actually converged is a failure mode worth naming.
+    \item \textbf{An initial 1-epoch pilot was misleading.} An initial 1-epoch pilot showed Option-2 BPC as a tie, which would have suggested that the medical tokenizer was a compute-efficiency trick rather than a real effect. The 2-epoch rerun and subsequent multi-seed sweep both disconfirm this: general's ``plateau'' at 1 epoch was a learning-rate schedule artifact (cosine had collapsed to 3e-5), not true convergence. Once the schedule was extended to span the full 2-epoch horizon, general kept improving on in-domain PubMed by $\sim$0.13 BPC --- and medical improved even more, by $\sim$0.15 BPC --- making medical's lead robust under both fairness frames. \textbf{Under-training can mask the effect being studied}, and running a short pilot without checking that both arms have actually converged is a failure mode worth naming.
 \end{enumerate}
 
 \subsection*{What the experiment does NOT show}
@@ -340,7 +340,8 @@ The qualitative samples in this section are from a single seed per tokenizer (th
 \begin{itemize}[leftmargin=*, itemsep=0pt]
     \item \textbf{Single-corpus tokenizers only.} Three tokenizers, each trained on one corpus. The natural ``best of both worlds'' candidate (a mixed-corpus tokenizer over PubMed + MTSamples + general English) is future work.
     \item \textbf{Vocab size held at 10{,}000.} A vocabulary-size sweep would tease apart how much of the register-distinctness scaling is about merge content vs.\ merge count.
-    \item \textbf{n=5/5/3 seeds, not 10+}, and the underlying GPTs are roughly 18x below Chinchilla-optimal. CIs are honest at the n's we have; whether the tokenizer effects widen or compress at scale is a question this study cannot settle. The Option-1 comparison also retains the v1 caveat that general and medical sit at different points in their cosine LR schedules at step 6{,}141.
+    \item \textbf{n=5/5/3 seeds, not 10+}, and the underlying GPTs are roughly 18x below Chinchilla-optimal. CIs are honest at the n's we have; whether the tokenizer effects widen or compress at scale is a question this study cannot settle. The Option-1 comparison also carries the caveat that general and medical sit at different points in their cosine LR schedules at step 6{,}141.
+    \item \textbf{The register-distinctness scaling is inferred from a single register pair} (PubMed vs MTSamples). The 80x ratio between the two effects is suggestive but a curve over 4--5 registers would be needed to claim the relationship is general.
 \end{itemize}
 
 % ---------------------------------------------------------------
@@ -361,27 +362,29 @@ If this pattern held at production scale --- a modest in-domain BPC advantage wi
 \end{enumerate}
 
 \paragraph{Broader takeaway.}
-Tokenization is often treated as a preprocessing step and receives less attention than architectural or training choices. This project is a data point in favor of taking it seriously: holding everything else constant, a different tokenizer measurably changed held-out BPC, altered the \emph{shape} of the model's generation errors, and --- most importantly --- \textbf{did not generalize where I naively assumed it would}. The MTSamples-arm result strengthens this argument by an order of magnitude: the largest tokenizer-driven effect we measured (0.78 BPC on a register-matched corpus) was about 80x bigger than the in-domain PubMed effect that motivated the project, and it was invisible in v1 because the relevant tokenizer wasn't in the experiment. The phrase ``medical tokenizer'' is less meaningful than ``PubMed-abstract tokenizer,'' and that distinction only became visible because MTSamples was in the evaluation suite \emph{and} a tokenizer trained on it was in the training-side suite.
+Tokenization is often treated as a preprocessing step and receives less attention than architectural or training choices. This project is a data point in favor of taking it seriously: holding everything else constant, a different tokenizer measurably changed held-out BPC, altered the \emph{shape} of the model's generation errors, and --- most importantly --- \textbf{did not generalize where I naively assumed it would}. The largest tokenizer-driven effect we measured (0.78 BPC on a register-matched corpus) was about 80x bigger than the in-domain PubMed effect that motivated the project, and would have been invisible without a tokenizer trained on a sufficiently distinct register. The phrase ``medical tokenizer'' is less meaningful than ``PubMed-abstract tokenizer,'' and that distinction only became visible because MTSamples was in the evaluation suite \emph{and} a tokenizer trained on it was in the training-side suite.
 
 % ---------------------------------------------------------------
 \section*{Appendix A --- Reproduction}
 
 All code in \texttt{Project/}. Pipeline orchestrated by \texttt{main.py}.
 
-\paragraph{v1 single-run pipeline.}
+\paragraph{Single-run pipeline.}
 
 \begin{verbatim}
 python main.py --phase prepare_data        # ~5-15 min, downloads corpora
-python main.py --phase train_tokenizers    # ~5-10 min, CPU-only (now trains 3 tokenizers)
+python main.py --phase train_tokenizers    # ~5-10 min, CPU-only (3 tokenizers)
 python main.py --phase efficiency          # Figure 1 numbers
 python main.py --phase construct_datasets  # ~5 min
-python main.py --phase train_all           # ~1.5-1.75 hr on RTX 4070 Ti (2 epochs)
-python main.py --phase evaluate
-python main.py --phase generate
+python main.py --phase train_all           # ~30 min on RTX 4070 Ti (2 epochs, 2 GPTs)
+python main.py --phase evaluate            # ~5 min
+python main.py --phase generate            # ~1 min
 python make_plots.py                       # Figures 1, 2, 3, 6
 \end{verbatim}
 
-\paragraph{v2 multi-seed sweep.}
+Training is the fastest part of the single-run pipeline; data prep, tokenization, evaluation, and generation together take longer than the actual GPT training.
+
+\paragraph{Multi-seed sweep.}
 
 \begin{verbatim}
 python main.py --phase sanity_check        # diagnostics on the new mtsamples tokenizer
@@ -389,9 +392,9 @@ python main.py --phase train_sweep         # 13 runs (5+5+3 seeds), ~3.7 hr on R
 python aggregate.py                        # multi-seed summary, t-tests, Figures 4, 5
 \end{verbatim}
 
-The file \texttt{artifacts/results/eval\_table.csv} is the source of truth for the v2 sweep; all aggregated tables and the multi-seed figures derive from it. Reference logs from prior phases: \texttt{results\_1epoch.md}, \texttt{results\_2epoch.md}, plus \texttt{artifacts/results/aggregate\_summary.md} for the multi-seed sweep.
+The file \texttt{artifacts/results/eval\_table.csv} is the source of truth for the multi-seed sweep; all aggregated tables and the multi-seed figures derive from it. Reference logs: \texttt{results\_1epoch.md}, \texttt{results\_2epoch.md}, and \texttt{artifacts/results/aggregate\_summary.md} for the multi-seed sweep.
 
 \paragraph{Wall times measured on a single RTX 4070 Ti.}
-Per-run training time: 5 general seeds 16:01--16:50; 5 medical seeds 12:37--13:14; 3 mtsamples seeds 15:43--15:53. Total v2 sweep wall (incl.\ inline eval): $\sim$3.7 hr. Total experiment compute (v1 1ep + 2ep + v2 sweep): $\sim$4.5 hr. All weights, datasets, figures, and samples under \texttt{artifacts/} (git-ignored).
+Per-run training time: 5 general seeds 16:01--16:50; 5 medical seeds 12:37--13:14; 3 mtsamples seeds 15:43--15:53. Total multi-seed sweep wall (incl.\ inline eval): $\sim$3.7 hr. Total experiment compute including the prior single-run experiments: $\sim$4.5 hr. All weights, datasets, figures, and samples under \texttt{artifacts/} (git-ignored).
 
 \end{document}
