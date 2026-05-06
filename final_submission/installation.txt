@@ -1,0 +1,63 @@
+Installation notes
+==================
+
+Tested on:
+  - Python 3.10
+  - PyTorch 2.7 + CUDA 11.8 on Windows 11 (RTX 4070 Ti)
+  - Also tested on Apple Silicon (MPS backend, much slower)
+
+Step 1 - Install PyTorch
+------------------------
+Install PyTorch first, matching your CUDA version. The default
+`pip install torch` often pulls a CPU-only wheel on Windows, which
+makes training ~50x slower. Use the official selector at
+https://pytorch.org/get-started/locally/ and pick a CUDA build that
+matches your driver (`nvidia-smi` shows your CUDA version).
+
+Example for CUDA 11.8:
+    pip install torch --index-url https://download.pytorch.org/whl/cu118
+
+Verify:
+    python -c "import torch; print(torch.cuda.is_available())"
+should print True if CUDA is wired up.
+
+On Apple Silicon, the default `pip install torch` is fine (it uses
+MPS automatically when CUDA isn't available).
+
+Step 2 - Install everything else
+--------------------------------
+    pip install -r requirements.txt
+
+requirements.txt covers:
+  - numpy
+  - transformers (>= 4.40, for the BPE tokenizer training API)
+  - datasets (>= 2.18, for downloading PubMed / wikitext / MTSamples)
+  - tqdm
+  - matplotlib
+
+`scipy` is also required for the paired t-tests in aggregate.py;
+it's part of the SciPy stack and already pulled in by most science
+distributions, but if you hit an ImportError just `pip install scipy`.
+
+Step 3 - HuggingFace dataset cache
+----------------------------------
+The first run of `prepare_data.py` will download three datasets to
+the HuggingFace cache (~/.cache/huggingface on Linux/Mac,
+%USERPROFILE%\.cache\huggingface on Windows). Total size is around 1 GB.
+You don't need a HuggingFace token; the datasets used here are public.
+
+If a particular HF mirror is offline, prepare_data.py tries a couple
+fallbacks for PubMed and MTSamples and prints which one worked. If
+all of them fail, it logs a warning and you can manually drop a
+matching one-doc-per-line text file at artifacts/data/.
+
+Step 4 - Verify the install
+---------------------------
+Smoke test (100 training steps, ~30 seconds on a GPU):
+    python main.py --phase prepare_data
+    python main.py --phase train_tokenizers
+    python main.py --phase construct_datasets
+    python main.py --phase smoke
+
+If smoke completes without errors and the loss visibly drops over
+the 100 steps, you're set.

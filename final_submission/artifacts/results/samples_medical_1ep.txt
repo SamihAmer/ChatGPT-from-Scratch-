@@ -1,0 +1,19 @@
+# Generations from [medical]  weights=C:\Users\Samih\ChatGPT-from-Scratch-\Project\artifacts\weights\medical\model_weights.pt  tokenizer=C:\Users\Samih\ChatGPT-from-Scratch-\Project\artifacts\tokenizers\medical
+
+--- prompt: 'Patient presents with' ---
+Patient presents with clinical features and diagnostic / diagnosis , prognosis of a unique type that is possible . the present case illustrates an emphasis on ultrasound in detailing workplace to which if this patient appears unsuccessful alongsecution towards treatment - related nature ; there can be similarities between these differences .<|endoftext|>
+
+--- prompt: 'CT of the abdomen shows' ---
+CT of the abdomen shows little resistance on mri inclination . however , it has been characterized as ancience s status and power patterns of resolution that is to impact af treatment for pah with various types such at risk per patient.we identified 3388 ( 6510,124 ) months following switching into whole - segment in nature and retrospectively from 25 patients who presented with tavi involvement having chalysters referred to a contour surgeon by consensuser oncology physicians guidelines / more notably related than other minorities without dmv either positive or negative tcrd due to genetic counseling ; this pattern was found only one
+
+--- prompt: 'The patient was administered' ---
+The patient was administered to january 2010 . in one of five patients with successful sclero - pena , were treated for endotracheal intubation or elective appendectomy ( 1 ) surgeries ; operative computed tomography imaging revealed an acceptable iliac vein after surgery and remained the same when no initial change during operation.conclusion:we recommend that application by minimally invasive laparoscopic clipping system is good approach combining single anterior camera and tracheal collapse could be used as a tool towards such diagnostics narrationally at correctly eliminate eile standard devices .<|endoftext|>
+
+--- prompt: 'Postoperative diagnosis:' ---
+Postoperative diagnosis:the pains score was 5.0 3 in first month . results : the proportion of clinicians were 0.3 , 2 to 8/10 ) with direct ( from 95% ci 1 - 141).conclusions and conclusion : the clinical profile measure relationship between the incidence rate of upper gastrointestinal bleeding remains unclear but there is a need for diagnostic accuracy followed by that treatment modality is not significant independent risks needed .<|endoftext|>
+
+--- prompt: 'Laparoscopic cholecystectomy was performed' ---
+Laparoscopic cholecystectomy was performed . patient s complaint and joint pain revealed a large cervical dislocation of anorexia ( 3.0 to 4,3-ylester ) in 2 patients with intramedullary abdominal ultrasonography , the clinical examination of these lesions that were related over 24 months since 2010 , two non - traumatic component deformity showed significantly different ocular complications requiring lumbar kyphotic surgeries for sparing fractures associated with distal tendon lourocil space distraction fixation or femoris pexicular bone loss on postoperative ct which received failure at 21 years followup during routine periodonted clipping when compared them using five year follow up evaluation
+
+--- prompt: 'The quick brown fox' ---
+The quick brown fox as sticness in other male patients . during addition , complete history of epilepsy was carried out on language examination and pathology examinations were performed . the mean symptoms resolved between six months postoperatively.results:of 62.8% cases received stnir after intervention therapy , 37 ( range 12 weeks ) ; 32 had no dry eye complaints loss before he complained of two minute saline at week 3 days to 8 month with retireted acetonide > 50 mg / kg creamil fever being visited for further treatment 4 days apart from a regular backward time taken through physical evaluation using ventilation tests which

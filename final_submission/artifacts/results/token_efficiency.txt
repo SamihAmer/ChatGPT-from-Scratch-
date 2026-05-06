@@ -1,0 +1,7 @@
+corpus,tokenizer,docs,chars,tokens,tokens_per_doc,chars_per_token
+pubmed_eval,general,2000,2460144,643455,321.73,3.8233
+pubmed_eval,medical,2000,2460144,506807,253.40,4.8542
+wikitext_eval,general,1298,576145,138314,106.56,4.1655
+wikitext_eval,medical,1298,576145,201898,155.55,2.8536
+mtsamples_eval,general,4966,15006542,4685678,943.55,3.2026
+mtsamples_eval,medical,4966,15006542,4679044,942.22,3.2072

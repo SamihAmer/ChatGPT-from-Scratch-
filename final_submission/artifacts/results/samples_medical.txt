@@ -1,0 +1,19 @@
+# Generations from [medical]  weights=C:\Users\Samih\ChatGPT-from-Scratch-\Project\artifacts\weights\medical\model_weights.pt  tokenizer=C:\Users\Samih\ChatGPT-from-Scratch-\Project\artifacts\tokenizers\medical
+
+--- prompt: 'Patient presents with' ---
+Patient presents with an excessive immune reaction involving vigorous throw - like cells and oligosmoli-10.electronic supplementary materialthe online version of this article ( doi:1 ) contains a total number of them in which only a small portion size that corresponded to the human alman 's phenomenon , called parvarioides are often conclusively motivated .<|endoftext|>
+
+--- prompt: 'CT of the abdomen shows' ---
+CT of the abdomen shows no difference in operative length and post - prostatectomy volume .<|endoftext|>
+
+--- prompt: 'The patient was administered' ---
+The patient was administered to 32 ( 7 ) in whom the initiation of chemotherapy , however it remains unclear what often underwent pancreaticoduodenectomy for metastases and extraperitoneal lymphoma . no evidence exists regarding management when benign local hcc is rare even after carcinoembryonic gastric bypass due not only distant metastasis or early - stage esophageal cancer disease recurrence should be considered as a curative strategy.conclusionour authors have reported that various interventional modalities are combined with this novel approach being limited by optimal use for patients undergoing pancreatobiliary resection but may cause one-day survival rate during these surgical procedures ; if they would perform less than 1 year prior
+
+--- prompt: 'Postoperative diagnosis:' ---
+Postoperative diagnosis:t-3 angiography was found in 44 ( 14.5% ) , respectively . of the 47 patients who underwent t7 for sga - ml and 66 ( 49.4 % were located at four thoracic center 's humorality or officege recovery during the procedure : 2 performed by 12 weeks after treatment with bbbden injection).conclusionswe conclude that ppl is a suitable adjunctive tool to differentiate lte between thrombotic capillaries when serial brain magnetic resonance imaging / mri examination can be used before surgery even if suspicious cerebral hemisphere may reagrically replicated
+
+--- prompt: 'Laparoscopic cholecystectomy was performed' ---
+Laparoscopic cholecystectomy was performed . the patient had a blood leak after conversion to 2 and 6 weeks with regards his right leg , 4 months later.conclusion:the tracheotomy is an emergency thoracoscopic surgery because it can cause serious complications in hemodynamically significant intubation but also by both respiratory system team groups are significantly more obvious than endoscopic needle irrigation alone or intra - procedural drainage ( tabri et al ; corporus spilum ) guided laparotomy as well safe techniques for treating chronic appendicitis patients undergoing laparoscopic cholecystostomyectomy .<|endoftext|>
+
+--- prompt: 'The quick brown fox' ---
+The quick brown fox - tags show no observance of a flow freezing . we also demonstrate that the chemical shift of this ligand becomes highly concentrated by fuzzy cell cycle , which is not readily explained by deuterase or helical as motivating imprinted intermediates . our work illustrates for further support and using real copenron / banding to employ single binoxial groups reveals an unusually similar interactions between cyclic dipeptide labeled clorbitol-7,2-tetramine 2b ( > 3 ) indicating activity for halohexylation in jurryow
