@@ -24,6 +24,7 @@ Usage:
 '''
 
 import argparse
+import csv
 import math
 import os
 import torch
@@ -31,6 +32,28 @@ import torch
 from gpt import GPTModel
 from tokenizer import HFTokenizer
 from train import pick_device
+
+
+# Order of columns in eval_table.csv. Adding a column means writing a new
+# header to a fresh file -- existing CSVs from earlier runs will not match.
+EVAL_CSV_COLUMNS = [
+    "seed", "tokenizer_name", "checkpoint_step", "eval_corpus",
+    "bpc", "ppl", "nll_nats", "n_tokens", "n_chars",
+    "weights_path",
+]
+
+
+def _append_eval_row(csv_path, row):
+    """Append one row to the multi-seed eval table. Creates header if file
+    is new. Caller is responsible for passing a row that includes every
+    column in EVAL_CSV_COLUMNS."""
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    new_file = not os.path.isfile(csv_path)
+    with open(csv_path, "a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=EVAL_CSV_COLUMNS)
+        if new_file:
+            w.writeheader()
+        w.writerow({k: row.get(k, "") for k in EVAL_CSV_COLUMNS})
 
 
 @torch.no_grad()
@@ -112,6 +135,17 @@ def main():
     ap.add_argument("--layers", type=int, default=6)
     ap.add_argument("--seq-len", type=int, default=256)
     ap.add_argument("--batch-size", type=int, default=16)
+    # Multi-seed sweep metadata. When --csv-append is set we'll write a row
+    # into the aggregate eval_table.csv. The four metadata flags below let
+    # the caller annotate that row without us trying to parse paths.
+    ap.add_argument("--csv-append", default="",
+                    help="If set, append a result row to this CSV (created if missing).")
+    ap.add_argument("--seed", type=int, default=-1)
+    ap.add_argument("--tokenizer-name", default="",
+                    help="Short label, e.g. 'general' / 'medical' / 'mtsamples'.")
+    ap.add_argument("--checkpoint-step", type=int, default=-1)
+    ap.add_argument("--eval-corpus", default="",
+                    help="Short label, e.g. 'pubmed_eval' / 'wikitext_eval' / 'mtsamples_eval'.")
     args = ap.parse_args()
 
     r = evaluate(args.weights, args.tokenizer, args.text,
@@ -124,6 +158,22 @@ def main():
             print(f"  {k:>22}: {v:.4f}")
         else:
             print(f"  {k:>22}: {v}")
+
+    if args.csv_append:
+        row = {
+            "seed": args.seed,
+            "tokenizer_name": args.tokenizer_name,
+            "checkpoint_step": args.checkpoint_step,
+            "eval_corpus": args.eval_corpus,
+            "bpc": r["bpc"],
+            "ppl": r["perplexity"],
+            "nll_nats": r["avg_nll_nats"],
+            "n_tokens": r["num_tokens_eval"],
+            "n_chars": r["num_chars"],
+            "weights_path": args.weights,
+        }
+        _append_eval_row(args.csv_append, row)
+        print(f"  [csv] appended row to {args.csv_append}")
 
 
 if __name__ == "__main__":

@@ -21,12 +21,25 @@ Usage:
 import argparse
 import csv
 import os
+import random
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
 from gpt import GPTModel
 from tokenizer import HFTokenizer
+
+
+def _seed_everything(seed):
+    """Seed the standard RNGs so two runs with the same --seed produce the
+    same model init and DataLoader shuffle order. Does NOT enable CuDNN
+    deterministic mode (that costs 10-20% throughput and isn't needed for
+    seed-controlled run-to-run reproducibility)."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def pick_device():
@@ -69,7 +82,9 @@ def _estimate_chars_per_token(tokenizer_dir, dataset, n_probe=500):
 
 def train(args):
     device = pick_device()
-    print(f"device: {device}")
+    print(f"device: {device}  | seed: {args.seed}")
+
+    _seed_everything(args.seed)
 
     os.makedirs(args.out, exist_ok=True)
 
@@ -80,10 +95,13 @@ def train(args):
     print(f"estimated chars/token for this tokenizer+corpus: {chars_per_token:.3f}")
 
     data_t = torch.tensor(data, dtype=torch.long)
+    loader_gen = torch.Generator()
+    loader_gen.manual_seed(args.seed)
     loader = torch.utils.data.DataLoader(
         torch.utils.data.TensorDataset(data_t),
         batch_size=args.batch_size,
         shuffle=True,
+        generator=loader_gen,
     )
 
     # vocab size must match the tokenizer used to build the dataset
@@ -199,6 +217,7 @@ def _save_meta(args, vocab_size, n_params, cpt, final_step, path):
         f.write(f"lr: {args.lr}\n")
         f.write(f"warmup: {args.warmup}\n")
         f.write(f"epochs: {args.epochs}\n")
+        f.write(f"seed: {args.seed}\n")
         f.write(f"final_step: {final_step}\n")
         f.write(f"chars_per_token: {cpt:.4f}\n")
 
@@ -223,6 +242,9 @@ def main():
                     help="Comma-separated step numbers at which to save intermediate weights "
                          "(e.g. '3070' to capture the point where medical finishes its epoch, "
                          "for a same-step fairness comparison with the general run).")
+    ap.add_argument("--seed", type=int, default=0,
+                    help="Seed for torch / numpy / DataLoader shuffle. "
+                         "Different seeds give different runs; same seed reproduces.")
     args = ap.parse_args()
     train(args)
 
